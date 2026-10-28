@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AttendX - Attendance Management System</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js for lightweight, clear state management -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Chart.js for analytics visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-full font-sans text-slate-800 antialiased selection:bg-brand-500 selection:text-white" x-data="attendanceApp()" x-init="initApp()">
+
+    <div class="min-h-full flex flex-col md:flex-row">
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 flex flex-col justify-between shadow-xl">
+            <div>
+                <!-- App Header -->
+                <div class="p-5 flex items-center gap-3 border-b border-slate-800">
+                    <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/30">
+                        <i data-lucide="check-square" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-white text-lg tracking-tight leading-none">AttendX</h1>
+                        <span class="text-xs text-slate-400">Attendance Manager</span>
+                    </div>
+                </div>
+
+                <!-- Nav Links -->
+                <nav class="p-4 space-y-1.5">
+                    <button @click="activeTab = 'dashboard'" :class="activeTab === 'dashboard' ? 'bg-brand-600 text-white font-medium shadow-md shadow-brand-600/20' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                        Dashboard
+                    </button>
+                    <button @click="activeTab = 'mark'" :class="activeTab === 'mark' ? 'bg-brand-600 text-white font-medium shadow-md shadow-brand-600/20' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
+                        <i data-lucide="user-check" class="w-4 h-4"></i>
+                        Mark Attendance
+                    </button>
+                    <button @click="activeTab = 'members'" :class="activeTab === 'members' ? 'bg-brand-600 text-white font-medium shadow-md shadow-brand-600/20' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        Members Directory
+                    </button>
+                    <button @click="activeTab = 'analytics'" :class="activeTab === 'analytics' ? 'bg-brand-600 text-white font-medium shadow-md shadow-brand-600/20' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200'" class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm transition-all duration-150">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+                        Analytics & Reports
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Footer / Quick Stats -->
+            <div class="p-4 border-t border-slate-800">
+                <div class="bg-slate-800/60 rounded-lg p-3 border border-slate-700/50 text-xs">
+                    <div class="flex justify-between items-center text-slate-400 mb-1">
+                        <span>Group/Class:</span>
+                        <span class="text-brand-500 font-semibold" x-text="selectedGroup"></span>
+                    </div>
+                    <div class="flex justify-between items-center text-slate-400">
+                        <span>Today's Date:</span>
+                        <span class="text-slate-300 font-medium" x-text="currentDate"></span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            
+            <!-- Top Header -->
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sticky top-0 z-10 shadow-sm">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-900" x-text="getTabTitle()"></h2>
+                    <p class="text-xs text-slate-500 mt-0.5" x-text="getTabDescription()"></p>
+                </div>
+
+                <!-- Global Filters & Quick Add -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Date Picker -->
+                    <div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium">
+                        <i data-lucide="calendar" class="w-4 h-4 text-slate-500"></i>
+                        <input type="date" x-model="selectedDate" @change="loadAttendanceForDate()" class="bg-transparent text-slate-700 outline-none cursor-pointer">
+                    </div>
+
+                    <!-- Department/Class Select -->
+                    <div class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-medium">
+                        <i data-lucide="layers" class="w-4 h-4 text-slate-500"></i>
+                        <select x-model="selectedGroup" @change="saveState()" class="bg-transparent text-slate-700 outline-none cursor-pointer">
+                            <template x-for="group in groups" :key="group">
+                                <option :value="group" x-text="group"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Add Member Trigger Button -->
+                    <button @click="openMemberModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i>
+                        Add Member
+                    </button>
+                </div>
+            </header>
+
+            <!-- Body View Panels -->
+            <div class="p-6 space-y-6 flex-1">
+                
+                <!-- Toast Notification Banner -->
+                <div x-cloak x-show="toast.show" x-transition:enter="transition ease-out duration-300 transform" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200 transform" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2" :class="toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-600'" class="fixed bottom-5 right-5 z-50 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm">
+                    <i :data-lucide="toast.type === 'error' ? 'alert-circle' : 'check-circle-2'" class="w-5 h-5"></i>
+                    <span x-text="toast.message"></span>
+                </div>
+
+                <!-- ================= VIEW 1: DASHBOARD ================= -->
+                <div x-show="activeTab === 'dashboard'" class="space-y-6" x-cloak>
+                    <!-- Summary Cards Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+                        <!-- Total Members Card -->
+                        <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Members</p>
+                                <h3 class="text-3xl font-bold text-slate-900 mt-1" x-text="filteredMembers.length"></h3>
+                                <p class="text-xs text-slate-400 mt-1" x-text="'In ' + selectedGroup"></p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-blue-50 text-brand-600 flex items-center justify-center">
+                                <i data-lucide="users" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <!-- Present Today Card -->
+                        <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Present Today</p>
+                                <h3 class="text-3xl font-bold text-emerald-600 mt-1" x-text="stats.present"></h3>
+                                <p class="text-xs text-emerald-600 font-medium mt-1" x-text="getRatioText(stats.present)"></p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <i data-lucide="user-check" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <!-- Absent Today Card -->
+                        <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Absent Today</p>
+                                <h3 class="text-3xl font-bold text-rose-600 mt-1" x-text="stats.absent"></h3>
+                                <p class="text-xs text-rose-600 font-medium mt-1" x-text="getRatioText(stats.absent)"></p>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                                <i data-lucide="user-x" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+
+                        <!-- Attendance Rate Card -->
+                        <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex items-center justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Attendance Rate</p>
+                                <h3 class="text-3xl font-bold text-indigo-600 mt-1" x-text="stats.rate + '%'"></h3>
+                                <div class="w-24 bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                                    <div class="bg-indigo-600 h-1.5 rounded-full transition-all duration-500" :style="`width: ${stats.rate}%`"></div>
+                                </div>
+                            </div>
+                            <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                <i data-lucide="percent" class="w-6 h-6"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Overview Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Left 2 Columns: Status Distribution & Quick Action -->
+                        <div class="lg:col-span-2 space-y-6">
+                            <!-- Quick Status Bar Breakdown -->
+                            <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h3 class="font-bold text-slate-900 text-base">Today's Attendance Breakdown</h3>
+                                    <span class="text-xs text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full font-medium" x-text="selectedDate"></span>
+                                </div>
+
+                                <!-- Progress Segment Bar -->
+                                <div class="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner mb-6">
+                                    <div :style="`width: ${stats.presentPct}%`" class="bg-emerald-500 transition-all duration-300" title="Present"></div>
+                                    <div :style="`width: ${stats.latePct}%`" class="bg-amber-500 transition-all duration-300" title="Late"></div>
+                                    <div :style="`width: ${stats.excusedPct}%`" class="bg-blue-500 transition-all duration-300" title="Excused"></div>
+                                    <div :style="`width: ${stats.absentPct}%`" class="bg-rose-500 transition-all duration-300" title="Absent"></div>
+                                </div>
+
+                                <!-- Grid Legend Stats -->
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    <div class="p-3 rounded-lg border border-emerald-100 bg-emerald-50/50">
+                                        <div class="flex items-center gap-2 text-xs text-emerald-700 font-semibold mb-1">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Present
+                                        </div>
+                                        <div class="text-lg font-bold text-slate-900" x-text="stats.present"></div>
+                                    </div>
+                                    <div class="p-3 rounded-lg border border-amber-100 bg-amber-50/50">
+                                        <div class="flex items-center gap-2 text-xs text-amber-700 font-semibold mb-1">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Late
+                                        </div>
+                                        <div class="text-lg font-bold text-slate-900" x-text="stats.late"></div>
+                                    </div>
+                                    <div class="p-3 rounded-lg border border-blue-100 bg-blue-50/50">
+                                        <div class="flex items-center gap-2 text-xs text-blue-700 font-semibold mb-1">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Excused
+                                        </div>
+                                        <div class="text-lg font-bold text-slate-900" x-text="stats.excused"></div>
+                                    </div>
+                                    <div class="p-3 rounded-lg border border-rose-100 bg-rose-50/50">
+                                        <div class="flex items-center gap-2 text-xs text-rose-700 font-semibold mb-1">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Absent
+                                        </div>
+                                        <div class="text-lg font-bold text-slate-900" x-text="stats.absent"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Unmarked/Pending Prompt Widget -->
+                            <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-xl p-6 shadow-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div>
+                                    <h4 class="font-bold text-lg">Ready to take today's roll call?</h4>
+                                    <p class="text-xs text-slate-300 mt-1" x-text="'Group: ' + selectedGroup + ' • Date: ' + selectedDate"></p>
+                                </div>
+                                <button @click="activeTab = 'mark'" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 rounded-lg text-sm font-semibold transition shadow-lg shadow-brand-600/30 flex items-center gap-2 whitespace-nowrap">
+                                    <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                    Go to Attendance Grid
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Visual Donut Chart -->
+                        <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm flex flex-col items-center justify-center">
+                            <h3 class="font-bold text-slate-900 text-base mb-4 self-start">Ratio Overview</h3>
+                            <div class="w-full h-56 flex items-center justify-center relative">
+                                <canvas id="dashboardChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW 2: MARK ATTENDANCE ================= -->
+                <div x-show="activeTab === 'mark'" class="space-y-4" x-cloak>
+                    <!-- Controls Header Bar -->
+                    <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <!-- Search Box -->
+                        <div class="relative flex-1 max-w-md">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" x-model="searchQuery" placeholder="Search member name or ID..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 focus:bg-white transition">
+                        </div>
+
+                        <!-- Bulk Action Buttons -->
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button @click="markAll('P')" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i data-lucide="check-check" class="w-3.5 h-3.5"></i> All Present
+                            </button>
+                            <button @click="markAll('A')" class="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i data-lucide="x-circle" class="w-3.5 h-3.5"></i> All Absent
+                            </button>
+                            <button @click="resetAll()" class="px-3 py-1.5 bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                                <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Attendance List Table / Cards -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <th class="py-3.5 px-4">Member Info</th>
+                                        <th class="py-3.5 px-4">ID / Roll</th>
+                                        <th class="py-3.5 px-4">Group</th>
+                                        <th class="py-3.5 px-4 text-center">Attendance Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-sm">
+                                    <template x-for="member in searchedMembers" :key="member.id">
+                                        <tr class="hover:bg-slate-50/70 transition-colors">
+                                            <!-- Member Avatar & Name -->
+                                            <td class="py-3 px-4">
+                                                <div class="flex items-center gap-3">
+                                                    <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-brand-500 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-sm" x-text="getInitials(member.name)"></div>
+                                                    <div>
+                                                        <div class="font-semibold text-slate-900" x-text="member.name"></div>
+                                                        <div class="text-xs text-slate-400" x-text="member.email || 'No email registered'"></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            <!-- Roll ID -->
+                                            <td class="py-3 px-4 text-slate-600 font-mono text-xs font-medium" x-text="member.rollId"></td>
+
+                                            <!-- Group Tag -->
+                                            <td class="py-3 px-4">
+                                                <span class="inline-block px-2.5 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium" x-text="member.group"></span>
+                                            </td>
+
+                                            <!-- Interactive Status Selector Buttons -->
+                                            <td class="py-3 px-4">
+                                                <div class="flex items-center justify-center gap-1.5">
+                                                    <!-- Present (P) -->
+                                                    <button @click="setAttendance(member.id, 'P')" 
+                                                        :class="getAttendanceStatus(member.id) === 'P' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 border-emerald-600' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 border-slate-200'"
+                                                        class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1">
+                                                        <span>P</span>
+                                                        <span class="hidden sm:inline font-normal text-[11px]">Present</span>
+                                                    </button>
+
+                                                    <!-- Late (L) -->
+                                                    <button @click="setAttendance(member.id, 'L')" 
+                                                        :class="getAttendanceStatus(member.id) === 'L' ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 border-amber-500' : 'bg-slate-100 text-slate-600 hover:bg-amber-50 hover:text-amber-700 border-slate-200'"
+                                                        class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1">
+                                                        <span>L</span>
+                                                        <span class="hidden sm:inline font-normal text-[11px]">Late</span>
+                                                    </button>
+
+                                                    <!-- Excused (E) -->
+                                                    <button @click="setAttendance(member.id, 'E')" 
+                                                        :class="getAttendanceStatus(member.id) === 'E' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 border-blue-600' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-700 border-slate-200'"
+                                                        class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1">
+                                                        <span>E</span>
+                                                        <span class="hidden sm:inline font-normal text-[11px]">Excused</span>
+                                                    </button>
+
+                                                    <!-- Absent (A) -->
+                                                    <button @click="setAttendance(member.id, 'A')" 
+                                                        :class="getAttendanceStatus(member.id) === 'A' ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 border-rose-600' : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700 border-slate-200'"
+                                                        class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all flex items-center gap-1">
+                                                        <span>A</span>
+                                                        <span class="hidden sm:inline font-normal text-[11px]">Absent</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <!-- Empty State -->
+                                    <template x-if="searchedMembers.length === 0">
+                                        <tr>
+                                            <td colspan="4" class="py-12 text-center text-slate-400">
+                                                <i data-lucide="user-x" class="w-10 h-10 mx-auto mb-2 stroke-1"></i>
+                                                <p class="font-medium text-slate-600">No members found</p>
+                                                <p class="text-xs mt-1">Try tweaking your search or select a different group filter.</p>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW 3: MEMBERS DIRECTORY ================= -->
+                <div x-show="activeTab === 'members'" class="space-y-4" x-cloak>
+                    <!-- Directory Controls Bar -->
+                    <div class="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="relative flex-1 max-w-md">
+                            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                            <input type="text" x-model="searchQuery" placeholder="Search members by name or ID..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-brand-500 focus:bg-white transition">
+                        </div>
+                        <button @click="openMemberModal()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition shadow-sm self-start sm:self-auto">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            Add New Member
+                        </button>
+                    </div>
+
+                    <!-- Members List Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <template x-for="member in searchedMembers" :key="member.id">
+                            <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col justify-between space-y-4">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-full bg-gradient-to-tr from-brand-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-md shadow-brand-500/20" x-text="getInitials(member.name)"></div>
+                                        <div>
+                                            <h4 class="font-bold text-slate-900 text-base" x-text="member.name"></h4>
+                                            <p class="text-xs text-slate-500 font-mono" x-text="'ID: ' + member.rollId"></p>
+                                        </div>
+                                    </div>
+                                    <span class="px-2.5 py-1 bg-brand-50 text-brand-700 text-xs font-semibold rounded-md border border-brand-100" x-text="member.group"></span>
+                                </div>
+
+                                <div class="text-xs space-y-1 text-slate-500 border-t border-slate-100 pt-3">
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400"></i>
+                                        <span x-text="member.email || 'N/A'"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400"></i>
+                                        <span x-text="member.phone || 'N/A'"></span>
+                                    </div>
+                                </div>
+
+                                <!-- Card Action Controls -->
+                                <div class="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                                    <button @click="openMemberModal(member)" class="p-1.5 text-slate-500 hover:text-brand-600 hover:bg-slate-100 rounded-lg transition" title="Edit Member">
+                                        <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                    </button>
+                                    <button @click="deleteMember(member.id)" class="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Delete Member">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- ================= VIEW 4: ANALYTICS & REPORTS ================= -->
+                <div x-show="activeTab === 'analytics'" class="space-y-6" x-cloak>
+                    <!-- Report Header Bar -->
+                    <div class="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div>
+                            <h3 class="font-bold text-slate-900 text-lg">Attendance Reports & Logs</h3>
+                            <p class="text-xs text-slate-500">Filter, review aggregate history, and export attendance logs to CSV.</p>
+                        </div>
+                        <button @click="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition shadow-sm">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            Export CSV Report
+                        </button>
+                    </div>
+
+                    <!-- Visual Trend Line Chart -->
+                    <div class="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
+                        <h4 class="font-bold text-slate-900 text-sm mb-4">Historical Attendance Overview</h4>
+                        <div class="w-full h-72">
+                            <canvas id="analyticsTrendChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Individual Overall Attendance Table -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-slate-200">
+                            <h4 class="font-bold text-slate-900 text-sm">Member Aggregate Performance</h4>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-500">
+                                        <th class="py-3 px-4">Member</th>
+                                        <th class="py-3 px-4">Group</th>
+                                        <th class="py-3 px-4 text-center">Present</th>
+                                        <th class="py-3 px-4 text-center">Late</th>
+                                        <th class="py-3 px-4 text-center">Excused</th>
+                                        <th class="py-3 px-4 text-center">Absent</th>
+                                        <th class="py-3 px-4 text-center">Score %</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-sm">
+                                    <template x-for="stat in getMemberAggregateStats()" :key="stat.member.id">
+                                        <tr class="hover:bg-slate-50/70 transition-colors">
+                                            <td class="py-3 px-4">
+                                                <div class="font-semibold text-slate-900" x-text="stat.member.name"></div>
+                                                <div class="text-xs text-slate-400 font-mono" x-text="stat.member.rollId"></div>
+                                            </td>
+                                            <td class="py-3 px-4 text-slate-600 text-xs" x-text="stat.member.group"></td>
+                                            <td class="py-3 px-4 text-center font-semibold text-emerald-600" x-text="stat.present"></td>
+                                            <td class="py-3 px-4 text-center font-semibold text-amber-600" x-text="stat.late"></td>
+                                            <td class="py-3 px-4 text-center font-semibold text-blue-600" x-text="stat.excused"></td>
+                                            <td class="py-3 px-4 text-center font-semibold text-rose-600" x-text="stat.absent"></td>
+                                            <td class="py-3 px-4 text-center">
+                                                <span class="inline-block px-2.5 py-1 rounded-full text-xs font-bold"
+                                                    :class="stat.percentage >= 80 ? 'bg-emerald-100 text-emerald-800' : (stat.percentage >= 60 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800')"
+                                                    x-text="stat.percentage + '%'">
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MEMBER MODAL (Add / Edit) -->
+    <div x-cloak x-show="showModal" class="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-5" @click.away="showModal = false">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-lg" x-text="isEditMode ? 'Edit Member Details' : 'Add New Member'"></h3>
+                <button @click="showModal = false" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form @submit.prevent="saveMember()" class="space-y-4">
+                <!-- Name -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Full Name *</label>
+                    <input type="text" x-model="memberForm.name" required placeholder="e.g. Sarah Jenkins" class="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+                </div>
+
+                <!-- Roll / ID -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Roll / ID Number *</label>
+                    <input type="text" x-model="memberForm.rollId" required placeholder="e.g. REG-1049" class="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+                </div>
+
+                <!-- Class / Group -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Class / Department *</label>
+                    <input type="text" x-model="memberForm.group" required placeholder="e.g. Class 10-A or Engineering" class="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+                </div>
+
+                <!-- Email (Optional) -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1">Email Address</label>
+                    <input type="email" x-model="memberForm.email" placeholder="sarah@example.com" class="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+                </div>
+
+                <!-- Modal Actions -->
+                <div class="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
+                    <button type="button" @click="showModal = false" class="px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold transition">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition shadow-md shadow-brand-600/30" x-text="isEditMode ? 'Update Member' : 'Save Member'"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Controller Logic -->
+    <script>
+        function attendanceApp() {
+            return {
+                activeTab: 'dashboard',
+                selectedDate: new Date().toISOString().split('T')[0],
+                currentDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                selectedGroup: 'Class 10-A',
+                searchQuery: '',
+                groups: ['Class 10-A', 'Class 10-B', 'Engineering Team', 'Design Guild'],
+                
+                // Core Data Structures
+                members: [],
+                attendanceRecords: {}, // Structure: { 'YYYY-MM-DD': { memberId: 'P' | 'A' | 'L' | 'E' } }
+                
+                // Modal State
+                showModal: false,
+                isEditMode: false,
+                memberForm: { id: null, name: '', rollId: '', group: '', email: '' },
+                
+                // Toast State
+                toast: { show: false, message: '', type: 'success' },
+
+                // Chart References
+                dashboardChartObj: null,
+                analyticsChartObj: null,
+
+                initApp() {
+                    this.loadSavedData();
+                    
+                    // Render lucide icons after DOM update
+                    this.$watch('activeTab', () => {
+                        this.$nextTick(() => {
+                            lucide.createIcons();
+                            if (this.activeTab === 'dashboard') this.renderDashboardChart();
+                            if (this.activeTab === 'analytics') this.renderAnalyticsChart();
+                        });
+                    });
+
+                    this.$nextTick(() => {
+                        lucide.createIcons();
+                        this.renderDashboardChart();
+                    });
+                },
+
+                // Mock Initial Data Seed
+                loadSavedData() {
+                    const localMembers = localStorage.getItem('attendx_members');
+                    const localRecords = localStorage.getItem('attendx_records');
+
+                    if (localMembers) {
+                        this.members = JSON.parse(localMembers);
+                    } else {
+                        // Seed default members
+                        this.members = [
+                            { id: '1', name: 'Alex Johnson', rollId: 'ST-101', group: 'Class 10-A', email: 'alex@school.edu' },
+                            { id: '2', name: 'Emma Watson', rollId: 'ST-102', group: 'Class 10-A', email: 'emma@school.edu' },
+                            { id: '3', name: 'Liam Neeson', rollId: 'ST-103', group: 'Class 10-A', email: 'liam@school.edu' },
+                            { id: '4', name: 'Sophia Miller', rollId: 'ST-104', group: 'Class 10-A', email: 'sophia@school.edu' },
+                            { id: '5', name: 'Noah Williams', rollId: 'ST-105', group: 'Class 10-B', email: 'noah@school.edu' },
+                            { id: '6', name: 'Olivia Brown', rollId: 'ENG-201', group: 'Engineering Team', email: 'olivia@tech.com' },
+                            { id: '7', name: 'Ethan Davis', rollId: 'ENG-202', group: 'Engineering Team', email: 'ethan@tech.com' }
+                        ];
+                        this.saveState();
+                    }
+
+                    if (localRecords) {
+                        this.attendanceRecords = JSON.parse(localRecords);
+                    } else {
+                        // Seed dummy past records for rich analytics display
+                        const today = this.selectedDate;
+                        this.attendanceRecords = {
+                            [today]: { '1': 'P', '2': 'P', '3': 'L', '4': 'A' }
+                        };
+                        this.saveState();
+                    }
+                },
+
+                saveState() {
+                    localStorage.setItem('attendx_members', JSON.stringify(this.members));
+                    localStorage.setItem('attendx_records', JSON.stringify(this.attendanceRecords));
+                    this.triggerChartUpdates();
+                },
+
+                triggerChartUpdates() {
+                    this.$nextTick(() => {
+                        if (this.activeTab === 'dashboard') this.renderDashboardChart();
+                        if (this.activeTab === 'analytics') this.renderAnalyticsChart();
+                    });
+                },
+
+                // Computed Member Filtering
+                get filteredMembers() {
+                    return this.members.filter(m => m.group === this.selectedGroup);
+                },
+
+                get searchedMembers() {
+                    const q = this.searchQuery.toLowerCase().trim();
+                    return this.filteredMembers.filter(m => 
+                        m.name.toLowerCase().includes(q) || 
+                        m.rollId.toLowerCase().includes(q)
+                    );
+                },
+
+                // Attendance Operations
+                getAttendanceStatus(memberId) {
+                    return (this.attendanceRecords[this.selectedDate] || {})[memberId] || null;
+                },
+
+                setAttendance(memberId, status) {
+                    if (!this.attendanceRecords[this.selectedDate]) {
+                        this.attendanceRecords[this.selectedDate] = {};
+                    }
+                    this.attendanceRecords[this.selectedDate][memberId] = status;
+                    this.saveState();
+                },
+
+                markAll(status) {
+                    if (!this.attendanceRecords[this.selectedDate]) {
+                        this.attendanceRecords[this.selectedDate] = {};
+                    }
+                    this.filteredMembers.forEach(m => {
+                        this.attendanceRecords[this.selectedDate][m.id] = status;
+                    });
+                    this.saveState();
+                    this.showToast(`Marked all members as ${status === 'P' ? 'Present' : 'Absent'}`);
+                },
+
+                resetAll() {
+                    if (this.attendanceRecords[this.selectedDate]) {
+                        this.filteredMembers.forEach(m => {
+                            delete this.attendanceRecords[this.selectedDate][m.id];
+                        });
+                        this.saveState();
+                        this.showToast('Cleared attendance records for selected date');
+                    }
+                },
+
+                // Computed Dashboard Stats
+                get stats() {
+                    const groupMembers = this.filteredMembers;
+                    const total = groupMembers.length;
+                    const dateRecords = this.attendanceRecords[this.selectedDate] || {};
+
+                    let present = 0, absent = 0, late = 0, excused = 0;
+
+                    groupMembers.forEach(m => {
+                        const status = dateRecords[m.id];
+                        if (status === 'P') present++;
+                        else if (status === 'A') absent++;
+                        else if (status === 'L') late++;
+                        else if (status === 'E') excused++;
+                    });
+
+                    const rate = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
+
+                    return {
+                        total,
+                        present,
+                        absent,
+                        late,
+                        excused,
+                        rate,
+                        presentPct: total ? (present / total) * 100 : 0,
+                        latePct: total ? (late / total) * 100 : 0,
+                        excusedPct: total ? (excused / total) * 100 : 0,
+                        absentPct: total ? (absent / total) * 100 : 0
+                    };
+                },
+
+                getRatioText(count) {
+                    const total = this.filteredMembers.length;
+                    if (!total) return '0%';
+                    return `${Math.round((count / total) * 100)}% of class`;
+                },
+
+                // Member Modal Actions
+                openMemberModal(member = null) {
+                    if (member) {
+                        this.isEditMode = true;
+                        this.memberForm = { ...member };
+                    } else {
+                        this.isEditMode = false;
+                        this.memberForm = { id: Date.now().toString(), name: '', rollId: '', group: this.selectedGroup, email: '' };
+                    }
+                    this.showModal = true;
+                },
+
+                saveMember() {
+                    if (!this.groups.includes(this.memberForm.group)) {
+                        this.groups.push(this.memberForm.group);
+                    }
+
+                    if (this.isEditMode) {
+                        const index = this.members.findIndex(m => m.id === this.memberForm.id);
+                        if (index !== -1) this.members[index] = { ...this.memberForm };
+                        this.showToast('Member updated successfully');
+                    } else {
+                        this.members.push({ ...this.memberForm });
+                        this.showToast('New member added successfully');
+                    }
+
+                    this.saveState();
+                    this.showModal = false;
+                },
+
+                deleteMember(id) {
+                    if (confirm('Are you sure you want to remove this member?')) {
+                        this.members = this.members.filter(m => m.id !== id);
+                        this.saveState();
+                        this.showToast('Member removed', 'error');
+                    }
+                },
+
+                // Analytics Helpers
+                getMemberAggregateStats() {
+                    return this.filteredMembers.map(member => {
+                        let present = 0, absent = 0, late = 0, excused = 0, totalMarked = 0;
+
+                        Object.keys(this.attendanceRecords).forEach(date => {
+                            const status = this.attendanceRecords[date][member.id];
+                            if (status) {
+                                totalMarked++;
+                                if (status === 'P') present++;
+                                else if (status === 'L') late++;
+                                else if (status === 'E') excused++;
+                                else if (status === 'A') absent++;
+                            }
+                        });
+
+                        const score = totalMarked > 0 ? Math.round(((present + late) / totalMarked) * 100) : 0;
+                        return { member, present, absent, late, excused, percentage: score };
+                    });
+                },
+
+                // Chart Rendering Methods
+                renderDashboardChart() {
+                    const ctx = document.getElementById('dashboardChart');
+                    if (!ctx) return;
+
+                    if (this.dashboardChartObj) this.dashboardChartObj.destroy();
+
+                    const s = this.stats;
+                    this.dashboardChartObj = new Chart(ctx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Present', 'Late', 'Excused', 'Absent'],
+                            datasets: [{
+                                data: [s.present, s.late, s.excused, s.absent],
+                                backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#f43f5e'],
+                                borderHeight: 0
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 12, font: { family: 'Inter', size: 11 } } }
+                            },
+                            cutout: '70%'
+                        }
+                    });
+                },
+
+                renderAnalyticsChart() {
+                    const ctx = document.getElementById('analyticsTrendChart');
+                    if (!ctx) return;
+
+                    if (this.analyticsChartObj) this.analyticsChartObj.destroy();
+
+                    // Retrieve recent recorded dates sorted
+                    const dates = Object.keys(this.attendanceRecords).sort().slice(-7);
+                    const presentData = [];
+                    const absentData = [];
+
+                    dates.forEach(date => {
+                        let p = 0, a = 0;
+                        this.filteredMembers.forEach(m => {
+                            const st = this.attendanceRecords[date]?.[m.id];
+                            if (st === 'P' || st === 'L') p++;
+                            if (st === 'A') a++;
+                        });
+                        presentData.push(p);
+                        absentData.push(a);
+                    });
+
+                    this.analyticsChartObj = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dates.length ? dates : ['Today'],
+                            datasets: [
+                                { label: 'Attended', data: presentData, borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.3 },
+                                { label: 'Absent', data: absentData, borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.1)', fill: true, tension: 0.3 }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            }
+                        }
+                    });
+                },
+
+                // Export to CSV Functionality
+                exportToCSV() {
+                    let csv = 'Date,Member ID,Member Name,Group,Status\n';
+                    
+                    Object.keys(this.attendanceRecords).forEach(date => {
+                        const recs = this.attendanceRecords[date];
+                        Object.keys(recs).forEach(memberId => {
+                            const member = this.members.find(m => m.id === memberId);
+                            if (member) {
+                                csv += `"${date}","${member.rollId}","${member.name}","${member.group}","${recs[memberId]}"\n`;
+                            }
+                        });
+                    });
+
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.setAttribute('href', url);
+                    a.setAttribute('download', `Attendance_Report_${this.selectedDate}.csv`);
+                    a.click();
+                    this.showToast('CSV Export downloaded');
+                },
+
+                // UI Helper Utils
+                getInitials(name) {
+                    if (!name) return 'U';
+                    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                },
+
+                showToast(msg, type = 'success') {
+                    this.toast = { show: true, message: msg, type };
+                    setTimeout(() => { this.toast.show = false; }, 3000);
+                },
+
+                getTabTitle() {
+                    switch (this.activeTab) {
+                        case 'dashboard': return 'Dashboard Overview';
+                        case 'mark': return 'Take Attendance';
+                        case 'members': return 'Members Directory';
+                        case 'analytics': return 'Reports & Insights';
+                        default: return 'AttendX';
+                    }
+                },
+
+                getTabDescription() {
+                    switch (this.activeTab) {
+                        case 'dashboard': return 'High-level metrics and current status breakdown.';
+                        case 'mark': return 'Quickly toggle present, absent, late, or excused statuses.';
+                        case 'members': return 'Manage student and team roster details.';
+                        case 'analytics': return 'Visualize attendance trends and download records.';
+                        default: return '';
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
